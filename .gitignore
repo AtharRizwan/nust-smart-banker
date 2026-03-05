@@ -1,0 +1,15 @@
+data/
+qdrant_data/
+uploaded_docs/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.pytest_cache/
+*.log

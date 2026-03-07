@@ -58,7 +58,9 @@ Strict rules:
 
 When answering:
 - Start with a direct answer to the customer's question.
-- Provide relevant details from the context.
+- If the question asks about a list of things (accounts, products, features, services, charges, etc.), enumerate EVERY relevant item found in the context — do not stop after the first one.
+- Provide relevant details from the context for each item where available.
+- Give ONE coherent answer. Do NOT restate, summarise, or repeat what you have already said.
 - End with an offer to help further if appropriate.
 """
 
@@ -286,13 +288,23 @@ class RAGChain:
         prompt = build_prompt(query, retrieved, chat_history)
         llm = self._ensure_llm()
 
-        full_response = []
+        # Buffer all tokens so we can apply the output guardrail to the full
+        # response before anything reaches the UI.  This prevents the display
+        # from showing content that the guardrail would later sanitise.
+        full_response: list[str] = []
         for token in llm.stream(prompt):
             full_response.append(token)
-            yield token
 
-        # Output guardrail on full response
-        complete = guardrails.check_output("".join(full_response), query)
+        # Apply output guardrail to the complete assembled response
+        sanitised = guardrails.check_output("".join(full_response), query)
+
+        # Yield word-by-word so callers get an incremental stream while still
+        # receiving only guardrail-sanitised content (no raw tokens ever escape).
+        if sanitised:
+            words = sanitised.split(" ")
+            for i, word in enumerate(words):
+                # Re-add the space that split() consumed, except after the last word
+                yield word if i == len(words) - 1 else word + " "
 
         # Emit sources as a sentinel payload at the end
         sources = []

@@ -32,6 +32,7 @@ def _load_model_and_tokenizer():
     )
 
     from configs.settings import (
+        HF_TOKEN,
         LLM_LOAD_IN_4BIT,
         LLM_MAX_NEW_TOKENS,
         LLM_MODEL_NAME,
@@ -39,10 +40,15 @@ def _load_model_and_tokenizer():
         LLM_TEMPERATURE,
     )
 
+    # token=None is treated as "no token" by transformers, so passing an empty
+    # string would cause a warning — normalise to None when unset.
+    _hf_token: str | None = HF_TOKEN or None
+
     logger.info("Loading tokeniser for %s …", LLM_MODEL_NAME)
     tokenizer = AutoTokenizer.from_pretrained(
         LLM_MODEL_NAME,
         trust_remote_code=True,
+        token=_hf_token,
     )
 
     if LLM_LOAD_IN_4BIT:
@@ -63,6 +69,7 @@ def _load_model_and_tokenizer():
         device_map="auto",  # automatically assigns layers to GPU/CPU
         trust_remote_code=True,
         torch_dtype=torch.float16,
+        token=_hf_token,
     )
     model.eval()
     logger.info("Model loaded successfully.")

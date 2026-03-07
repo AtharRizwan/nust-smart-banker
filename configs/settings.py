@@ -3,7 +3,18 @@ Central configuration for NUST Smart Banker.
 All tuneable constants live here so every module imports from one place.
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env from the project root (silently a no-op if the file is absent)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# ─── Hugging Face ─────────────────────────────────────────────────────────────
+# Required to download gated models without running `huggingface-cli login`.
+# Set HF_TOKEN in a .env file at the project root (see .env.example).
+HF_TOKEN: str = os.getenv("HF_TOKEN", "")
 
 # ─── Project Paths ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent

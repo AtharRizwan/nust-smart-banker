@@ -2,6 +2,8 @@
 Shared text-cleaning and chunking utilities used across the pipeline.
 """
 
+from __future__ import annotations
+
 import re
 import unicodedata
 from typing import List

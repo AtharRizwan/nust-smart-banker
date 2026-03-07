@@ -65,15 +65,34 @@ nust-smart-banker/
 git clone https://github.com/AtharRizwan/nust-smart-banker.git
 cd nust-smart-banker
 
-# Install all dependencies
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+# Create and activate virtual environment (recommended)
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / macOS
 
-# Download the spaCy model required by Presidio
-python -m spacy download en_core_web_lg
+pip install -r requirements.txt
 ```
 
-### First Run — Index the Knowledge Base
+### Step 1 — Download All Models (run once)
+
+Before launching the app, pre-download all models to the project's `.cache/`
+directory on the E: drive so nothing needs to be fetched at runtime:
+
+```bash
+python setup_models.py
+```
+
+This will download (sequentially, with progress output):
+
+| Model | Size | Purpose |
+|---|---|---|
+| `BAAI/bge-m3` | ~570 MB | Dense embeddings for retrieval |
+| `Qwen/Qwen2.5-3B-Instruct` | ~6 GB (fp16) | LLM answer generation |
+| `en_core_web_lg` | ~700 MB | spaCy NLP for Presidio PII detection |
+
+> **One-time only.** On subsequent runs all models load from `.cache/` — no internet required.
+
+### Step 2 — Index the Knowledge Base (run once)
 
 The knowledge base is indexed **automatically** the first time you launch the app.
 To pre-build the index manually:

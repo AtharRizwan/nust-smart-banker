@@ -18,6 +18,14 @@ HF_TOKEN: str = os.getenv("HF_TOKEN", "")
 
 # ─── Project Paths ────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Set Hugging Face and Torch cache to the project directory to avoid C: drive space issues
+os.environ["HF_HOME"] = str(BASE_DIR / ".cache" / "huggingface")
+os.environ["HF_HUB_CACHE"] = str(BASE_DIR / ".cache" / "huggingface" / "hub")
+os.environ["TRANSFORMERS_CACHE"] = str(BASE_DIR / ".cache" / "huggingface" / "transformers")
+os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(BASE_DIR / ".cache" / "sentence_transformers")
+os.environ["TORCH_HOME"] = str(BASE_DIR / ".cache" / "torch")
+
 DATA_DIR = BASE_DIR / "data"
 QDRANT_DIR = BASE_DIR / "qdrant_data"
 UPLOADED_DOCS_DIR = BASE_DIR / "uploaded_docs"

@@ -1,13 +1,14 @@
 data/
 qdrant_data/
 uploaded_docs/
+.cache/
 __pycache__/
 **/__pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env
-.venv
+.venv/
 *.egg-info/
 dist/
 build/

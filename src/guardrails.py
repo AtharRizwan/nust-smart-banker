@@ -178,8 +178,8 @@ class Guardrails:
     def _try_load_nemo():
         """Load NeMo Guardrails if installed; return None otherwise."""
         try:
-            from nemoguardrails import RailsConfig, LLMRails
             from configs.settings import GUARDRAILS_CONFIG_DIR
+            from nemoguardrails import LLMRails, RailsConfig
 
             config_path = GUARDRAILS_CONFIG_DIR / "rails.co"
             if not config_path.exists():

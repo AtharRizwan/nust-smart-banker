@@ -15,6 +15,15 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterator, List, Optional
 
+from configs.settings import (
+    HF_TOKEN,
+    LLM_LOAD_IN_4BIT,
+    LLM_MAX_NEW_TOKENS,
+    LLM_MODEL_NAME,
+    LLM_REPETITION_PENALTY,
+    LLM_TEMPERATURE,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,14 +40,6 @@ def _load_model_and_tokenizer():
         TextIteratorStreamer,
     )
 
-    from configs.settings import (
-        HF_TOKEN,
-        LLM_LOAD_IN_4BIT,
-        LLM_MAX_NEW_TOKENS,
-        LLM_MODEL_NAME,
-        LLM_REPETITION_PENALTY,
-        LLM_TEMPERATURE,
-    )
 
     # token=None is treated as "no token" by transformers, so passing an empty
     # string would cause a warning — normalise to None when unset.
@@ -71,6 +72,11 @@ def _load_model_and_tokenizer():
         torch_dtype=torch.float16,
         token=_hf_token,
     )
+    # Double check if we can move entirely to CUDA if it wasn't assigned
+    if torch.cuda.is_available() and str(model.device) == "cpu":
+        logger.info("Manually moving model to CUDA...")
+        model = model.to("cuda")
+
     model.eval()
     logger.info("Model loaded successfully.")
     return model, tokenizer

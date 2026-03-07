@@ -193,7 +193,6 @@ def _extract_sheet_text(ws) -> List[tuple[str, str]]:
             continue
 
         # Decide if this row is a question or answer continuation
-        stripped = row_text.rstrip("?. ")
         is_question = row_text.rstrip().endswith("?") or (
             # Numbered questions like "1.What are the benefits..."
             re.match(r"^\d+[\.\)]", row_text) and len(row_text) < 200

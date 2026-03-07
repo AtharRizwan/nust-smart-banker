@@ -7,9 +7,12 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+.venv
 *.egg-info/
 dist/
 build/
 .ruff_cache/
 .pytest_cache/
 *.log
+AGENTS.md
+.python-version

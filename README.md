@@ -55,7 +55,7 @@ nust-smart-banker/
 
 ### Prerequisites
 
-- Python 3.10 – 3.14
+- Python 3.11
 - CUDA-capable GPU with ≥ 6 GB VRAM (RTX 4050 or better)
 - CUDA drivers installed
 
@@ -66,8 +66,6 @@ git clone https://github.com/AtharRizwan/nust-smart-banker.git
 cd nust-smart-banker
 
 # Install all dependencies
-pip install -r requirements.txt --break-system-packages
-# or in a virtual environment (recommended):
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 

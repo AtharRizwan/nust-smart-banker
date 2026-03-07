@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import openpyxl
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from configs.settings import (
     FAQ_JSON_PATH,

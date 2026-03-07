@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Iterator, List, Optional, Tuple
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from configs.settings import RELEVANCE_THRESHOLD, RETRIEVAL_TOP_K
 

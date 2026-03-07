@@ -6,7 +6,7 @@ import re
 import unicodedata
 from typing import List
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from configs.settings import CHUNK_SIZE, CHUNK_OVERLAP
 

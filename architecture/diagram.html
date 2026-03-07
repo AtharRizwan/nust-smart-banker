@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>NUST Smart Banker – RAG System Architecture</title>
+    <style>
+        body {
+            margin: 0;
+            background: #F0F2F5;
+            display: flex;
+            justify-content: center;
+            padding: 30px 16px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        .wrap {
+            max-width: 1220px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #0D1B2A;
+            margin: 0 0 6px;
+        }
+
+        .sub {
+            text-align: center;
+            font-size: 13px;
+            color: #6B7A8D;
+            margin: 0 0 22px;
+        }
+
+        svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 22px;
+            margin-top: 18px;
+            padding: 14px 18px;
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid #DDE3EC;
+        }
+
+        .li {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12.5px;
+            color: #455A64;
+            font-weight: 500;
+        }
+
+        .ld {
+            width: 15px;
+            height: 15px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>NUST Smart Banker — RAG System Architecture</h1>
+        <p class="sub">Retrieval-Augmented Generation &nbsp;·&nbsp; Multi-layer Safety Guardrails &nbsp;·&nbsp;
+            Qwen2.5-3B-Instruct &nbsp;·&nbsp; BAAI/bge-m3 &nbsp;·&nbsp; Qdrant</p>
+
+        <svg viewBox="0 0 1200 730" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <marker id="ag" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#607D8B" />
+                </marker>
+                <marker id="agr" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#00704A" />
+                </marker>
+                <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#C62828" />
+                </marker>
+                <marker id="ao" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#E65100" />
+                </marker>
+                <marker id="at" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#00796B" />
+                </marker>
+                <marker id="ab" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#1565C0" />
+                </marker>
+                <marker id="ac" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto">
+                    <polygon points="0 0,9 3.5,0 7" fill="#00838F" />
+                </marker>
+                <filter id="sh">
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018" />
+                </filter>
+            </defs>
+
+            <!-- ═══ LAYER BANDS ═══ -->
+            <!-- ① Presentation -->
+            <rect x="10" y="10" width="1180" height="122" rx="12" fill="#EBF5F0" opacity="0.75" />
+            <text x="26" y="30" font-size="12" font-weight="700" fill="#00704A" opacity="0.9">① PRESENTATION
+                LAYER</text>
+
+            <!-- ② Safety (both guardrails) -->
+            <rect x="10" y="142" width="1180" height="152" rx="12" fill="#FDECEA" opacity="0.75" />
+            <text x="26" y="161" font-size="12" font-weight="700" fill="#C62828" opacity="0.9">② SAFETY LAYER —
+                GUARDRAILS</text>
+
+            <!-- ③ Orchestration -->
+            <rect x="10" y="304" width="1180" height="96" rx="12" fill="#F3E8FF" opacity="0.75" />
+            <text x="26" y="323" font-size="12" font-weight="700" fill="#6A1B9A" opacity="0.9">③ ORCHESTRATION
+                LAYER</text>
+
+            <!-- ④ Retrieval -->
+            <rect x="10" y="410" width="1180" height="148" rx="12" fill="#E3F2FD" opacity="0.75" />
+            <text x="26" y="429" font-size="12" font-weight="700" fill="#1565C0" opacity="0.9">④ RETRIEVAL &amp;
+                INDEXING LAYER — HYBRID SEARCH</text>
+
+            <!-- ⑤ Generation -->
+            <rect x="10" y="568" width="1180" height="112" rx="12" fill="#FFF3E0" opacity="0.75" />
+            <text x="26" y="587" font-size="12" font-weight="700" fill="#E65100" opacity="0.9">⑤ GENERATION LAYER</text>
+
+            <!-- ═══ NODES ═══ -->
+            <!-- User -->
+            <rect x="44" y="36" width="188" height="66" rx="12" fill="#1565C0" filter="url(#sh)" />
+            <text x="138" y="64" text-anchor="middle" font-size="16" font-weight="700" fill="white">User</text>
+            <text x="138" y="85" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.8)"
+                font-style="italic">Customer</text>
+
+            <!-- Streamlit UI -->
+            <rect x="360" y="36" width="326" height="66" rx="12" fill="#00704A" filter="url(#sh)" />
+            <text x="523" y="64" text-anchor="middle" font-size="16" font-weight="700" fill="white">Streamlit UI</text>
+            <text x="523" y="85" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.8)"
+                font-style="italic">Chat · Admin / Upload · Architecture tabs</text>
+
+            <!-- Input Guardrails -->
+            <rect x="40" y="168" width="396" height="108" rx="12" fill="#C62828" filter="url(#sh)" />
+            <text x="238" y="200" text-anchor="middle" font-size="16" font-weight="700" fill="white">Input
+                Guardrails</text>
+            <text x="238" y="221" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">Jailbreak detection (20+ regex) · Hard-block keywords</text>
+            <text x="238" y="239" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">PII detection · Length limit (2 000 chars)</text>
+            <text x="238" y="263" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.6)">Applied before
+                retrieval</text>
+
+            <!-- Output Guardrails -->
+            <rect x="762" y="168" width="396" height="108" rx="12" fill="#B71C1C" filter="url(#sh)" />
+            <text x="960" y="200" text-anchor="middle" font-size="16" font-weight="700" fill="white">Output
+                Guardrails</text>
+            <text x="960" y="221" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">Template leak · Competitor redaction</text>
+            <text x="960" y="239" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">PII strip · Length cap · NeMo Guardrails</text>
+            <text x="960" y="263" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.6)">Applied after
+                generation</text>
+
+            <!-- RAG Chain -->
+            <rect x="276" y="322" width="448" height="64" rx="12" fill="#6A1B9A" filter="url(#sh)" />
+            <text x="500" y="349" text-anchor="middle" font-size="16" font-weight="700" fill="white">RAG Chain
+                (LangChain)</text>
+            <text x="500" y="371" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">Retrieve → Relevance gate (≥ 0.30) → Prompt assembly → Generate</text>
+
+            <!-- BGE-M3 -->
+            <rect x="40" y="445" width="254" height="88" rx="12" fill="#1976D2" filter="url(#sh)" />
+            <text x="167" y="475" text-anchor="middle" font-size="15" font-weight="700" fill="white">BGE-M3
+                Embeddings</text>
+            <text x="167" y="493" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">BAAI/bge-m3 · dim=1024 · CUDA</text>
+            <text x="167" y="511" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">Normalised cosine similarity</text>
+
+            <!-- Qdrant – wider, mentions data sources -->
+            <rect x="380" y="432" width="320" height="110" rx="12" fill="#00796B" filter="url(#sh)" />
+            <text x="540" y="460" text-anchor="middle" font-size="15" font-weight="700" fill="white">Qdrant Vector
+                Store</text>
+            <text x="540" y="479" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">HNSW · Disk-persistent · nust_bank_docs</text>
+            <text x="540" y="498" text-anchor="middle" font-size="11.5" fill="rgba(255,255,255,0.72)">Sources: FAQ JSON
+                · Product XLSX</text>
+            <text x="540" y="515" text-anchor="middle" font-size="11.5" fill="rgba(255,255,255,0.72)">Admin Uploads ·
+                Presidio PII-cleaned</text>
+            <text x="540" y="532" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.55)">⚡ RRF fusion
+                (k=60)</text>
+
+            <!-- BM25 -->
+            <rect x="892" y="440" width="264" height="88" rx="12" fill="#00838F" filter="url(#sh)" />
+            <text x="1024" y="468" text-anchor="middle" font-size="15" font-weight="700" fill="white">BM25
+                Re-ranker</text>
+            <text x="1024" y="487" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">rank-bm25 · Okapi BM25</text>
+            <text x="1024" y="506" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">Keyword scoring · RRF fusion</text>
+
+            <!-- Qwen -->
+            <rect x="276" y="590" width="448" height="70" rx="12" fill="#E65100" filter="url(#sh)" />
+            <text x="500" y="618" text-anchor="middle" font-size="16" font-weight="700"
+                fill="white">Qwen2.5-3B-Instruct</text>
+            <text x="500" y="640" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.82)"
+                font-style="italic">3.09B params · 4-bit NF4 (bitsandbytes) · ~2.0 GB VRAM · 32K ctx · Temp=0.2</text>
+
+            <!-- ═══ ARROWS ═══ -->
+
+            <!-- 1. User → UI: query (horizontal right, top) -->
+            <line x1="232" y1="61" x2="360" y2="61" stroke="#00704A" stroke-width="2.2" marker-end="url(#agr)" />
+            <text x="295" y="55" text-anchor="middle" font-size="12" fill="#00704A" font-style="italic">query</text>
+
+            <!-- 2. UI → User: answer (horizontal left, bottom) — RETURN PATH TO USER -->
+            <line x1="360" y1="80" x2="232" y2="80" stroke="#607D8B" stroke-width="2.2" marker-end="url(#ag)" />
+            <text x="295" y="96" text-anchor="middle" font-size="12" fill="#607D8B" font-style="italic">answer</text>
+
+            <!-- 3. UI (bottom-left area) → Input Guardrails (top) -->
+            <path d="M 460,102 C 445,132 340,154 320,168" stroke="#607D8B" stroke-width="2" fill="none"
+                marker-end="url(#ag)" />
+            <text x="375" y="132" text-anchor="middle" font-size="12" fill="#607D8B" font-style="italic">user
+                query</text>
+
+            <!-- 4. Input Guardrails (bottom) → RAG Chain (top-left) -->
+            <path d="M 310,276 C 320,298 350,312 370,322" stroke="#607D8B" stroke-width="2" fill="none"
+                marker-end="url(#ag)" />
+            <text x="296" y="300" text-anchor="end" font-size="12" fill="#607D8B" font-style="italic">safe query</text>
+
+            <!-- 5. RAG Chain (bottom-left) → BGE-M3 (top) -->
+            <path d="M 275,350 L 175,350 175,450" stroke="#1976D2" stroke-width="2" fill="none"
+                marker-end="url(#ab)" />
+            <text x="248" y="406" text-anchor="middle" font-size="12" fill="#1976D2" font-style="italic">embed
+                query</text>
+
+            <!-- 6. RAG Chain (bottom-right) → BM25 (top) -->
+            <path d="M 668,386 C 720,408 880,428 940,440" stroke="#00838F" stroke-width="2" fill="none"
+                marker-end="url(#ac)" />
+            <text x="812" y="406" text-anchor="middle" font-size="12" fill="#00838F" font-style="italic">keyword
+                search</text>
+
+            <!-- 7. BGE-M3 (right) → Qdrant (left) -->
+            <line x1="294" y1="476" x2="380" y2="476" stroke="#1976D2" stroke-width="2" marker-end="url(#ab)" />
+            <text x="337" y="461" text-anchor="middle" font-size="12" fill="#1976D2" font-style="italic">dense
+                vec</text>
+
+            <!-- 8. BM25 (left) → Qdrant (right) -->
+            <line x1="892" y1="476" x2="700" y2="476" stroke="#00838F" stroke-width="2" marker-end="url(#ac)" />
+            <text x="796" y="461" text-anchor="middle" font-size="12" fill="#00838F" font-style="italic">BM25
+                score</text>
+
+            <!-- 9. Qdrant (top) → RAG Chain (bottom): top-5 chunks, STRAIGHT UP via right side of qdrant -->
+            <line x1="600" y1="432" x2="600" y2="386" stroke="#00796B" stroke-width="2.2" marker-end="url(#at)" />
+            <text x="610" y="410" font-size="12" fill="#00796B" font-style="italic">top-5 chunks</text>
+
+            <!-- 10. RAG Chain → Qwen: routed at x=337, between BGE-M3 (right=294) and Qdrant (left=380) -->
+            <path d="M 337,386 L 337,590" stroke="#E65100" stroke-width="2.2" fill="none" marker-end="url(#ao)" />
+            <!-- label sits in the gap right of the arrow, clear of both boxes -->
+            <text x="265" y="460" text-anchor="start" font-size="12" fill="#E65100" font-style="italic"
+                transform="rotate(-90,355,492)">formatted prompt</text>
+
+            <!-- 11. Qwen (right) → right margin → up → Output Guardrails (right edge) -->
+            <path d="M 724,625 L 1180,625 L 1180,222 L 1155,222" stroke="#C62828" stroke-width="2.2"
+                stroke-dasharray="7,4" fill="none" marker-end="url(#ar)" />
+            <text x="940" y="614" text-anchor="middle" font-size="12" fill="#C62828" font-style="italic">raw
+                response</text>
+
+            <!-- 12. Output Guardrails → UI: L-shaped path (up then left into UI bottom-right) -->
+            <!-- Goes: from Output Guard top-center (960,168) straight up to y=108, then left to UI bottom-right (686,108) -->
+            <path d="M 960,168 L 960,108 L 686,108" stroke="#00704A" stroke-width="2.2" fill="none"
+                marker-end="url(#agr)" />
+            <!-- label on the horizontal segment, clear of all boxes -->
+            <rect x="762" y="90" width="136" height="20" rx="4" fill="#F0F2F5" />
+            <text x="830" y="111" text-anchor="middle" font-size="12" fill="#00704A" font-style="italic">sanitised
+                answer</text>
+
+        </svg>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="li">
+                <div class="ld" style="background:#1565C0"></div>User
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#00704A"></div>UI / Response flow
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#C62828"></div>Safety Guardrails
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#6A1B9A"></div>RAG Orchestration
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#1976D2"></div>Embeddings (BGE-M3)
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#00796B"></div>Vector Store (Qdrant)
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#00838F"></div>BM25 Re-ranker
+            </div>
+            <div class="li">
+                <div class="ld" style="background:#E65100"></div>Language Model (Qwen)
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

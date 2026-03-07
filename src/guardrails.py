@@ -84,7 +84,6 @@ _HARD_BLOCK_KEYWORDS: set[str] = {
     "heroin",
     "terrorism",
     "terrorist",
-    "jihad",
 }
 
 # Competitor bank names (output should not praise them)

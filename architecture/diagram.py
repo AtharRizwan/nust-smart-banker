@@ -1,7 +1,9 @@
 """
 Generate the NUST Smart Banker system architecture diagram.
 
-Produces: architecture/architecture.png
+Produces:
+  architecture/architecture.png   (high-res PNG for README / reports)
+  architecture/diagram.html       (interactive HTML version — open in browser)
 
 Run:
     python architecture/diagram.py
@@ -11,286 +13,355 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")  # headless backend — no display needed
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+from matplotlib.patches import FancyBboxPatch
+from matplotlib.lines import Line2D
 
-# ── Output path ──────────────────────────────────────────────────────────────
-OUT_PATH = Path(__file__).parent / "architecture.png"
+OUT_PNG  = Path(__file__).parent / "architecture.png"
+OUT_HTML = Path(__file__).parent / "diagram.html"
 
-# ── Colour palette ───────────────────────────────────────────────────────────
-C = {
-    "user": "#2196F3",  # blue
-    "ui": "#00704A",  # NUST green
-    "guard": "#E53935",  # red (guardrails)
-    "rag": "#7B1FA2",  # purple
-    "retrieval": "#0288D1",  # teal-blue
-    "llm": "#F57C00",  # orange
-    "storage": "#388E3C",  # dark green
-    "output": "#00704A",  # NUST green
-    "arrow": "#455A64",  # dark grey
-    "bg": "#FAFAFA",
-    "box_text": "white",
+# ── Palette ───────────────────────────────────────────────────────────────────
+P = {
+    "user":      "#1565C0",
+    "ui":        "#00704A",
+    "guard":     "#C62828",
+    "rag":       "#6A1B9A",
+    "bge":       "#1976D2",
+    "qdrant":    "#00796B",
+    "bm25":      "#00838F",
+    "llm":       "#E65100",
+    "data":      "#455A64",
+    "arrow":     "#78909C",
+    "arrow_ok":  "#00704A",
+    "bg":        "#F8F9FC",
+    "white":     "#FFFFFF",
 }
 
-# ── Helper: rounded rectangle with label ─────────────────────────────────────
+# ── Layer background colours (very light) ─────────────────────────────────────
+LAYERS = {
+    "presentation": ("#EBF5F0", "#00704A"),
+    "safety_in":    ("#FDECEA", "#C62828"),
+    "orchestration":("#F3E8FF", "#6A1B9A"),
+    "retrieval":    ("#E3F2FD", "#1565C0"),
+    "datasources":  ("#ECEFF1", "#455A64"),
+    "generation":   ("#FFF3E0", "#E65100"),
+    "safety_out":   ("#FDECEA", "#C62828"),
+}
 
 
-def draw_box(ax, x, y, w, h, label, sublabel="", color="#333333", fontsize=9):
-    box = FancyBboxPatch(
-        (x - w / 2, y - h / 2),
-        w,
-        h,
-        boxstyle="round,pad=0.015",
-        linewidth=1.5,
-        edgecolor="white",
-        facecolor=color,
-        zorder=3,
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def layer_band(ax, y_top, height, face, label, label_color, xleft=0.02, xright=0.98):
+    """Draw a horizontal band representing an architecture layer."""
+    rect = FancyBboxPatch(
+        (xleft, y_top - height), xright - xleft, height,
+        boxstyle="round,pad=0.005",
+        linewidth=0, facecolor=face, alpha=0.55, zorder=0,
     )
-    ax.add_patch(box)
+    ax.add_patch(rect)
     ax.text(
-        x,
-        y + (0.015 if sublabel else 0),
+        xleft + 0.012, y_top - 0.008,
         label,
-        ha="center",
-        va="center",
-        fontsize=fontsize,
-        fontweight="bold",
-        color=C["box_text"],
-        zorder=4,
-        wrap=True,
+        ha="left", va="top",
+        fontsize=7.5, fontweight="bold",
+        color=label_color, alpha=0.8, zorder=1,
     )
-    if sublabel:
-        ax.text(
-            x,
-            y - 0.035,
-            sublabel,
-            ha="center",
-            va="center",
-            fontsize=7,
-            color=(1, 1, 1, 0.85),
-            zorder=4,
-            style="italic",
-        )
 
 
-def draw_arrow(ax, x1, y1, x2, y2, label="", color="#455A64"):
+def node(ax, cx, cy, w, h, title, subtitle="", color="#333", fontsize=8.5):
+    """Draw a rounded-rectangle node with title and optional subtitle."""
+    box = FancyBboxPatch(
+        (cx - w / 2, cy - h / 2), w, h,
+        boxstyle="round,pad=0.012",
+        linewidth=0, facecolor=color,
+        zorder=3,
+        clip_on=False,
+    )
+    # subtle shadow
+    shadow = FancyBboxPatch(
+        (cx - w / 2 + 0.003, cy - h / 2 - 0.004), w, h,
+        boxstyle="round,pad=0.012",
+        linewidth=0, facecolor="#000000", alpha=0.08,
+        zorder=2, clip_on=False,
+    )
+    ax.add_patch(shadow)
+    ax.add_patch(box)
+
+    ty = cy + (0.012 if subtitle else 0)
+    ax.text(cx, ty, title,
+            ha="center", va="center",
+            fontsize=fontsize, fontweight="bold",
+            color="white", zorder=4, clip_on=False)
+    if subtitle:
+        ax.text(cx, cy - 0.016, subtitle,
+                ha="center", va="center",
+                fontsize=6.5, color=(1, 1, 1, 0.80),
+                style="italic", zorder=4, clip_on=False,
+                wrap=False)
+
+
+def arrow(ax, x1, y1, x2, y2, label="", color="#78909C", labelside="right"):
+    """Draw an annotated arrow between two points."""
     ax.annotate(
         "",
-        xy=(x2, y2),
-        xytext=(x1, y1),
+        xy=(x2, y2), xytext=(x1, y1),
         arrowprops=dict(
             arrowstyle="-|>",
-            color=color,
-            lw=1.8,
-            mutation_scale=14,
+            color=color, lw=1.6,
+            mutation_scale=12,
+            connectionstyle="arc3,rad=0.0",
         ),
-        zorder=2,
+        zorder=5,
     )
     if label:
-        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-        ax.text(
-            mx + 0.01,
-            my,
-            label,
-            ha="left",
-            va="center",
-            fontsize=7,
-            color=color,
-            zorder=5,
-        )
+        mx = (x1 + x2) / 2
+        my = (y1 + y2) / 2
+        dx = 0.014 if labelside == "right" else -0.014
+        ax.text(mx + dx, my, label,
+                ha="left" if labelside == "right" else "right",
+                va="center",
+                fontsize=6.5, color=color,
+                style="italic", zorder=6,
+                bbox=dict(boxstyle="round,pad=0.02",
+                          fc=P["bg"], ec="none", alpha=0.85))
 
 
-# ── Build figure ──────────────────────────────────────────────────────────────
-
+# ── Main diagram ──────────────────────────────────────────────────────────────
 
 def build_diagram():
-    fig, ax = plt.subplots(figsize=(14, 9))
-    ax.set_xlim(0, 1.4)
+    FIG_W, FIG_H = 18, 13
+    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
+    ax.set_xlim(0, 1.0)
     ax.set_ylim(0, 1.0)
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
     ax.axis("off")
-    fig.patch.set_facecolor(C["bg"])
+    fig.patch.set_facecolor(P["bg"])
+    ax.set_facecolor(P["bg"])
 
-    # ── Title ────────────────────────────────────────────────────────────────
-    ax.text(
-        0.7,
-        0.97,
-        "NUST Smart Banker – RAG System Architecture",
-        ha="center",
-        va="top",
-        fontsize=13,
-        fontweight="bold",
-        color="#1A1A2E",
-    )
+    # ── Title ──────────────────────────────────────────────────────────────
+    ax.text(0.50, 0.975,
+            "NUST Smart Banker — RAG System Architecture",
+            ha="center", va="top",
+            fontsize=15, fontweight="bold", color="#0D1B2A")
+    ax.text(0.50, 0.952,
+            "Retrieval-Augmented Generation · Multi-layer Safety Guardrails · "
+            "Qwen2.5-3B-Instruct · BAAI/bge-m3 · Qdrant",
+            ha="center", va="top",
+            fontsize=8.5, color="#6B7A8D")
 
-    # ── Layer backgrounds ─────────────────────────────────────────────────────
-    def layer_bg(y_center, height, label, color):
-        rect = FancyBboxPatch(
-            (0.02, y_center - height / 2),
-            1.36,
-            height,
-            boxstyle="round,pad=0.008",
-            linewidth=0,
-            facecolor=color,
-            alpha=0.08,
-            zorder=0,
-        )
-        ax.add_patch(rect)
-        ax.text(
-            0.04,
-            y_center + height / 2 - 0.018,
-            label,
-            ha="left",
-            va="top",
-            fontsize=7,
-            color=color,
-            fontweight="bold",
-            zorder=1,
-        )
+    # ── Layer Y coords (top edge, height) ──────────────────────────────────
+    #   Layers arranged top-to-bottom with equal gaps.
+    #   Each (y_top, height) pair
+    L = {
+        "pres" :  (0.935, 0.100),
+        "sin"  :  (0.810, 0.090),
+        "orch" :  (0.690, 0.090),
+        "retr" :  (0.560, 0.110),
+        "data" :  (0.415, 0.110),
+        "gen"  :  (0.265, 0.100),
+        "sout" :  (0.130, 0.090),
+    }
 
-    layer_bg(0.845, 0.10, "Presentation Layer", C["ui"])
-    layer_bg(0.69, 0.10, "Safety Layer", C["guard"])
-    layer_bg(0.53, 0.10, "Orchestration Layer", C["rag"])
-    layer_bg(0.355, 0.14, "Retrieval & Storage Layer", C["retrieval"])
-    layer_bg(0.175, 0.14, "Generation Layer", C["llm"])
+    # draw layer bands
+    configs = [
+        ("pres",  LAYERS["presentation"],  "① Presentation Layer"),
+        ("sin",   LAYERS["safety_in"],     "② Safety Layer — Input Guardrails"),
+        ("orch",  LAYERS["orchestration"], "③ Orchestration Layer"),
+        ("retr",  LAYERS["retrieval"],     "④ Retrieval & Indexing Layer — Hybrid Search"),
+        ("data",  LAYERS["datasources"],   "⑤ Knowledge Base — Data Sources"),
+        ("gen",   LAYERS["generation"],    "⑥ Generation Layer"),
+        ("sout",  LAYERS["safety_out"],    "⑦ Safety Layer — Output Guardrails"),
+    ]
+    for key, (face, lc), label in configs:
+        yt, h = L[key]
+        layer_band(ax, yt, h, face, label, lc)
 
-    # ── Boxes ─────────────────────────────────────────────────────────────────
-    BW, BH = 0.20, 0.065
+    # ── Node centres (cx, cy) ─────────────────────────────────────────────
+    NW, NH = 0.155, 0.058   # standard node width / height
+    WW = 0.36               # wide node width
 
     # Presentation
-    draw_box(ax, 0.22, 0.845, BW, BH, "User", "Customer", C["user"])
-    draw_box(ax, 0.70, 0.845, 0.36, BH, "Streamlit UI", "Chat + Admin tabs", C["ui"])
+    cy_pres  = L["pres"][0]  - L["pres"][1]  / 2
+    cx_user  = 0.16
+    cx_ui    = 0.54
 
-    # Safety – Input
-    draw_box(
-        ax,
-        0.70,
-        0.69,
-        0.44,
-        BH,
-        "Input Guardrails",
-        "Jailbreak · PII · Harmful content · Length",
-        C["guard"],
-    )
+    node(ax, cx_user, cy_pres, NW, NH, "User", "Customer", P["user"])
+    node(ax, cx_ui,   cy_pres, WW, NH, "Streamlit UI",
+         "Chat · Admin / Upload · Architecture tabs", P["ui"])
+
+    # Input guardrails
+    cy_sin = L["sin"][0] - L["sin"][1] / 2
+    node(ax, 0.50, cy_sin, 0.62, NH,
+         "Input Guardrails",
+         "Jailbreak (20+ regex) · Hard-block keywords · PII detection · Length limit (2 000 chars)",
+         P["guard"])
 
     # Orchestration
-    draw_box(
-        ax,
-        0.70,
-        0.53,
-        0.38,
-        BH,
-        "RAG Chain (LangChain)",
-        "Retrieval → Prompt assembly → Generation",
-        C["rag"],
-    )
+    cy_orch = L["orch"][0] - L["orch"][1] / 2
+    node(ax, 0.50, cy_orch, 0.65, NH,
+         "RAG Chain (LangChain)",
+         "Retrieval → Relevance gate (threshold 0.30) → Prompt assembly → Generation",
+         P["rag"])
 
-    # Retrieval & Storage
-    draw_box(
-        ax, 0.33, 0.355, 0.28, BH, "BGE-M3 Embeddings", "BAAI/bge-m3", C["retrieval"]
-    )
-    draw_box(
-        ax,
-        0.70,
-        0.355,
-        0.26,
-        BH,
-        "Qdrant Vector Store",
-        "Disk-persistent",
-        C["storage"],
-    )
-    draw_box(
-        ax, 1.07, 0.355, 0.24, BH, "BM25 Re-ranker", "rank-bm25 · RRF", C["retrieval"]
-    )
+    # Retrieval
+    cy_retr = L["retr"][0] - L["retr"][1] / 2
+    cx_bge    = 0.18
+    cx_qdrant = 0.50
+    cx_bm25   = 0.82
+    node(ax, cx_bge,    cy_retr, 0.24, NH, "BGE-M3 Embeddings",
+         "BAAI/bge-m3 · dim=1024 · CUDA", P["bge"])
+    node(ax, cx_qdrant, cy_retr, 0.26, NH, "Qdrant Vector Store",
+         "Disk-persistent · HNSW · nust_bank_docs", P["qdrant"])
+    node(ax, cx_bm25,   cy_retr, 0.24, NH, "BM25 Re-ranker",
+         "rank-bm25 · Okapi · RRF fusion", P["bm25"])
 
-    # Data sources (below storage)
-    draw_box(ax, 0.58, 0.215, 0.24, BH, "FAQ JSON", "15 Q&A pairs", "#546E7A")
-    draw_box(
-        ax, 0.87, 0.215, 0.24, BH, "Product XLSX", "34 sheets · 200+ Q&A", "#546E7A"
-    )
-    draw_box(ax, 1.16, 0.215, 0.20, BH, "Uploads", "Real-time updates", "#546E7A")
+    # Data sources
+    cy_data = L["data"][0] - L["data"][1] / 2
+    cx_faq  = 0.20
+    cx_xlsx = 0.50
+    cx_upl  = 0.80
+    node(ax, cx_faq,  cy_data, 0.26, NH, "FAQ JSON",
+         "funds_transfer_faq.json · Q&A categories", P["data"])
+    node(ax, cx_xlsx, cy_data, 0.30, NH, "Product XLSX",
+         "34 product sheets · 200+ Q&A pairs", P["data"])
+    node(ax, cx_upl,  cy_data, 0.26, NH, "Admin Uploads",
+         ".txt / .json / .xlsx · Real-time ingest", P["data"])
 
     # Generation
-    draw_box(
-        ax,
-        0.55,
-        0.175,
-        0.38,
-        BH,
-        "Qwen2.5-3B-Instruct",
-        "4-bit quantised · RTX 4050 (6 GB VRAM)",
-        C["llm"],
+    cy_gen = L["gen"][0] - L["gen"][1] / 2
+    node(ax, 0.50, cy_gen, 0.60, NH,
+         "Qwen2.5-3B-Instruct",
+         "3.09B params · 4-bit NF4 (bitsandbytes) · ~2.0 GB VRAM · 32K context · Temp=0.2",
+         P["llm"])
+
+    # Output guardrails
+    cy_sout = L["sout"][0] - L["sout"][1] / 2
+    node(ax, 0.50, cy_sout, 0.62, NH,
+         "Output Guardrails",
+         "Template leak · Competitor redaction · PII strip · Length cap (3 000 chars) · NeMo Guardrails",
+         P["guard"])
+
+    # ── Arrows ────────────────────────────────────────────────────────────
+
+    # User ↔ UI (horizontal, bidirectional)
+    mid_y = cy_pres
+    ax.annotate("", xy=(cx_ui - WW/2, mid_y + 0.010),
+                xytext=(cx_user + NW/2, mid_y + 0.010),
+                arrowprops=dict(arrowstyle="-|>", color=P["ui"], lw=1.6, mutation_scale=11), zorder=5)
+    ax.text((cx_user + cx_ui)/2, mid_y + 0.022, "query",
+            ha="center", fontsize=6.5, color=P["ui"], style="italic")
+
+    ax.annotate("", xy=(cx_user + NW/2, mid_y - 0.010),
+                xytext=(cx_ui - WW/2, mid_y - 0.010),
+                arrowprops=dict(arrowstyle="-|>", color=P["arrow"], lw=1.6, mutation_scale=11), zorder=5)
+    ax.text((cx_user + cx_ui)/2, mid_y - 0.024, "answer",
+            ha="center", fontsize=6.5, color=P["arrow"], style="italic")
+
+    # UI → Input guardrails (down)
+    arrow(ax, cx_ui, cy_pres - NH/2, 0.50, cy_sin + NH/2,
+          "user query", P["arrow"])
+
+    # Input guardrails → RAG chain (down)
+    arrow(ax, 0.50, cy_sin - NH/2, 0.50, cy_orch + NH/2,
+          "safe query", P["arrow"])
+
+    # RAG chain → BGE-M3 (diagonal left-down)
+    arrow(ax, 0.38, cy_orch - NH/2, cx_bge + 0.04, cy_retr + NH/2,
+          "embed query", P["arrow"], labelside="left")
+
+    # RAG chain → BM25 (diagonal right-down)
+    arrow(ax, 0.62, cy_orch - NH/2, cx_bm25 - 0.04, cy_retr + NH/2,
+          "BM25 keyword", P["arrow"])
+
+    # BGE-M3 → Qdrant (horizontal right)
+    arrow(ax, cx_bge + NW/2 + 0.01, cy_retr, cx_qdrant - 0.13, cy_retr,
+          "dense vector", P["bge"])
+
+    # BM25 → Qdrant (horizontal left)
+    arrow(ax, cx_bm25 - NW/2 - 0.01, cy_retr, cx_qdrant + 0.13, cy_retr,
+          "BM25 score", P["bm25"], labelside="left")
+
+    # Qdrant → RAG chain (up, labelled "top-K chunks")
+    arrow(ax, cx_qdrant, cy_retr + NH/2, 0.50, cy_orch - NH/2,
+          "top-5 chunks", P["qdrant"])
+
+    # Data sources → Qdrant (up arrows)
+    for cx_src in [cx_faq, cx_xlsx, cx_upl]:
+        ax.annotate("", xy=(cx_qdrant, cy_retr - NH/2),
+                    xytext=(cx_src, cy_data + NH/2),
+                    arrowprops=dict(arrowstyle="-|>", color="#90A4AE", lw=1.2,
+                                   mutation_scale=10,
+                                   connectionstyle="arc3,rad=0.0"), zorder=5)
+    ax.text(0.50, (cy_data + NH/2 + cy_retr - NH/2)/2,
+            "ingest pipeline", ha="center", fontsize=6.5,
+            color="#90A4AE", style="italic",
+            bbox=dict(boxstyle="round,pad=0.02", fc=P["bg"], ec="none", alpha=0.85))
+
+    # RAG chain → LLM (down)
+    arrow(ax, 0.50, cy_orch - NH/2, 0.50, cy_gen + NH/2,
+          "formatted prompt", P["llm"])
+
+    # LLM → Output guardrails (down)
+    arrow(ax, 0.50, cy_gen - NH/2, 0.50, cy_sout + NH/2,
+          "raw response", P["guard"])
+
+    # Output guardrails → UI (long upward curved arrow on left side)
+    ax.annotate(
+        "",
+        xy=(0.10, cy_pres - NH/2),
+        xytext=(0.10, cy_sout - NH/2),
+        arrowprops=dict(
+            arrowstyle="-|>",
+            color=P["arrow_ok"], lw=2.0,
+            mutation_scale=12,
+            connectionstyle="arc3,rad=0.0",
+        ),
+        zorder=5,
     )
+    ax.text(0.068, (cy_pres + cy_sout)/2, "sanitised\nanswer",
+            ha="center", va="center", fontsize=6.5,
+            color=P["arrow_ok"], style="italic", rotation=90,
+            bbox=dict(boxstyle="round,pad=0.03", fc=P["bg"], ec="none", alpha=0.85))
 
-    # Safety – Output
-    draw_box(
-        ax,
-        0.70,
-        0.53 - 0.16,
-        0.44,
-        BH,
-        "Output Guardrails",
-        "PII strip · Competitor redact · Template leak",
-        C["guard"],
-    )
+    # ── RRF label in retrieval band ────────────────────────────────────────
+    ax.text(cx_qdrant, cy_retr - NH/2 - 0.022, "⚡ Reciprocal Rank Fusion (RRF, k=60)",
+            ha="center", va="top", fontsize=7, color=P["qdrant"], fontweight="bold")
 
-    # ── Arrows ────────────────────────────────────────────────────────────────
-    A = C["arrow"]
-    # User → UI
-    draw_arrow(ax, 0.32, 0.845, 0.52, 0.845, "query", A)
-    # UI → Input guardrails
-    draw_arrow(ax, 0.70, 0.812, 0.70, 0.722, "", A)
-    # Input guardrails → RAG chain
-    draw_arrow(ax, 0.70, 0.657, 0.70, 0.563, "", A)
-    # RAG chain → BGE-M3
-    draw_arrow(ax, 0.57, 0.497, 0.38, 0.388, "embed query", A)
-    # BGE-M3 → Qdrant
-    draw_arrow(ax, 0.48, 0.355, 0.57, 0.355, "dense search", A)
-    # RAG chain → BM25
-    draw_arrow(ax, 0.83, 0.497, 1.02, 0.388, "BM25 search", A)
-    # BM25 → Qdrant (RRF)
-    draw_arrow(ax, 0.95, 0.355, 0.84, 0.355, "RRF fuse", A)
-    # Qdrant → RAG chain (context)
-    draw_arrow(ax, 0.70, 0.322, 0.70, 0.265, "top-5 chunks", A)
-    # Context → Qwen
-    draw_arrow(ax, 0.655, 0.248, 0.60, 0.208, "prompt", A)
-    # Qwen → Output guardrails
-    draw_arrow(ax, 0.62, 0.175, 0.70, 0.393 - 0.025, "response", A)
-    # Output guardrails → UI
-    draw_arrow(ax, 0.70, 0.40, 0.70, 0.815, "safe answer", C["ui"])
-    # UI → User
-    draw_arrow(ax, 0.52, 0.845, 0.32, 0.845, "answer", C["ui"])
-
-    # Data sources → Qdrant
-    draw_arrow(ax, 0.58, 0.248, 0.64, 0.322, "", "#78909C")
-    draw_arrow(ax, 0.87, 0.248, 0.76, 0.322, "", "#78909C")
-    draw_arrow(ax, 1.16, 0.248, 0.84, 0.322, "", "#78909C")
-
-    # ── Legend ────────────────────────────────────────────────────────────────
-    legend_items = [
-        (C["user"], "User"),
-        (C["ui"], "UI / Response"),
-        (C["guard"], "Guardrails"),
-        (C["rag"], "RAG Orchestration"),
-        (C["retrieval"], "Retrieval"),
-        (C["llm"], "Language Model"),
-        (C["storage"], "Vector Store / Data"),
+    # ── Legend ─────────────────────────────────────────────────────────────
+    items = [
+        (P["user"],   "User"),
+        (P["ui"],     "UI / Response"),
+        (P["guard"],  "Guardrails"),
+        (P["rag"],    "RAG Orchestration"),
+        (P["bge"],    "Embeddings"),
+        (P["qdrant"], "Vector Store"),
+        (P["bm25"],   "BM25 Re-ranker"),
+        (P["llm"],    "Language Model"),
+        (P["data"],   "Data Sources"),
     ]
-    handles = [mpatches.Patch(color=c, label=lbl) for c, lbl in legend_items]
+    handles = [mpatches.Patch(color=c, label=lbl) for c, lbl in items]
     ax.legend(
         handles=handles,
-        loc="lower left",
+        loc="lower right",
         fontsize=7.5,
-        framealpha=0.9,
-        ncol=4,
-        bbox_to_anchor=(0.02, 0.01),
+        framealpha=0.95,
+        ncol=3,
+        bbox_to_anchor=(0.98, 0.005),
+        title="Component Types",
+        title_fontsize=8,
     )
 
-    plt.tight_layout()
-    fig.savefig(OUT_PATH, dpi=160, bbox_inches="tight", facecolor=C["bg"])
-    print(f"Architecture diagram saved to {OUT_PATH}")
-    return OUT_PATH
+    # ── Save ───────────────────────────────────────────────────────────────
+    plt.tight_layout(pad=0.4)
+    fig.savefig(OUT_PNG, dpi=180, bbox_inches="tight", facecolor=P["bg"])
+    plt.close(fig)
+    print(f"✓ PNG  saved → {OUT_PNG}")
+    print(f"✓ HTML saved → {OUT_HTML}  (open in browser for interactive view)")
+    return OUT_PNG
 
 
 if __name__ == "__main__":

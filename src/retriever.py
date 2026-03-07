@@ -19,8 +19,9 @@ from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 from rank_bm25 import BM25Okapi
-from sentence_transformers import SentenceTransformer
 
+# configs.settings MUST be imported before sentence_transformers so that
+# SENTENCE_TRANSFORMERS_HOME / HF_HOME env-vars are set before the library loads.
 from configs.settings import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL_NAME,
@@ -29,6 +30,7 @@ from configs.settings import (
     QDRANT_DIR,
     RETRIEVAL_TOP_K,
 )
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +61,21 @@ class BankRetriever:
     """
 
     def __init__(self) -> None:
-        logger.info("Loading embedding model: %s", EMBEDDING_MODEL_NAME)
+        import torch
         # token=None is treated as "no token" by sentence-transformers
         _hf_token: str | None = HF_TOKEN or None
-        self.embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME, token=_hf_token)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info("Loading embedding model on %s: %s", device, EMBEDDING_MODEL_NAME)
+        # `token` kwarg was added in sentence-transformers 2.3; fall back to
+        # the older `use_auth_token` parameter for backwards compatibility.
+        try:
+            self.embed_model = SentenceTransformer(
+                EMBEDDING_MODEL_NAME, device=device, token=_hf_token
+            )
+        except TypeError:
+            self.embed_model = SentenceTransformer(
+                EMBEDDING_MODEL_NAME, device=device, use_auth_token=_hf_token
+            )
 
         # Persist Qdrant to disk so vectors survive app restarts
         QDRANT_DIR.mkdir(parents=True, exist_ok=True)
@@ -100,7 +113,8 @@ class BankRetriever:
         """Return the number of vectors currently in the collection."""
         try:
             info = self.client.get_collection(QDRANT_COLLECTION_NAME)
-            return info.vectors_count or 0
+            # points_count is the non-deprecated field in recent Qdrant versions
+            return info.points_count or info.vectors_count or 0
         except Exception:
             return 0
 

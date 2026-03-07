@@ -25,6 +25,30 @@ from configs.settings import RELEVANCE_THRESHOLD, RETRIEVAL_TOP_K
 
 logger = logging.getLogger(__name__)
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _build_sources(retrieved: List[Tuple[Document, float]]) -> List[dict]:
+    """Build a de-duplicated source metadata list from retrieved (doc, score) pairs."""
+    sources = []
+    seen: set = set()
+    for doc, score in retrieved:
+        src_key = (
+            doc.metadata.get("product")
+            or doc.metadata.get("category")
+            or doc.metadata.get("source", "")
+        )
+        if src_key and src_key not in seen:
+            seen.add(src_key)
+            sources.append(
+                {
+                    "label": src_key,
+                    "score": round(score, 3),
+                    "doc_type": doc.metadata.get("doc_type", ""),
+                }
+            )
+    return sources
+
 # ─── Response dataclass ───────────────────────────────────────────────────────
 
 
@@ -229,28 +253,9 @@ class RAGChain:
         # ── 6. Output guardrail ───────────────────────────────────────────────
         raw_answer = guardrails.check_output(raw_answer, query)
 
-        # ── 7. Build source metadata list ─────────────────────────────────────
-        sources = []
-        seen = set()
-        for doc, score in retrieved:
-            src_key = (
-                doc.metadata.get("product")
-                or doc.metadata.get("category")
-                or doc.metadata.get("source", "")
-            )
-            if src_key and src_key not in seen:
-                seen.add(src_key)
-                sources.append(
-                    {
-                        "label": src_key,
-                        "score": round(score, 3),
-                        "doc_type": doc.metadata.get("doc_type", ""),
-                    }
-                )
-
         return RAGResponse(
             answer=raw_answer,
-            sources=sources,
+            sources=_build_sources(retrieved),
             retrieved_docs=retrieved,
         )
 
@@ -307,18 +312,7 @@ class RAGChain:
                 yield word if i == len(words) - 1 else word + " "
 
         # Emit sources as a sentinel payload at the end
-        sources = []
-        seen = set()
-        for doc, score in retrieved:
-            src_key = (
-                doc.metadata.get("product")
-                or doc.metadata.get("category")
-                or doc.metadata.get("source", "")
-            )
-            if src_key and src_key not in seen:
-                seen.add(src_key)
-                sources.append({"label": src_key, "score": round(score, 3)})
-        yield f"__SOURCES__:{_json.dumps(sources)}"
+        yield f"__SOURCES__:{_json.dumps(_build_sources(retrieved))}"
 
 
 # ─── Singleton ────────────────────────────────────────────────────────────────

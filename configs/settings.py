@@ -1,0 +1,62 @@
+"""
+Central configuration for NUST Smart Banker.
+All tuneable constants live here so every module imports from one place.
+"""
+
+from pathlib import Path
+
+# ─── Project Paths ────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+QDRANT_DIR = BASE_DIR / "qdrant_data"
+UPLOADED_DOCS_DIR = BASE_DIR / "uploaded_docs"
+
+# Raw dataset files
+FAQ_JSON_PATH = DATA_DIR / "funds_transfer_app_features_faq.json"
+PRODUCT_XLSX_PATH = DATA_DIR / "NUST Bank-Product-Knowledge.xlsx"
+
+# ─── Qdrant ───────────────────────────────────────────────────────────────────
+QDRANT_COLLECTION_NAME = "nust_bank_docs"
+# Embedding dimension for BAAI/bge-m3 dense vector
+EMBEDDING_DIM = 1024
+
+# ─── Embedding Model ──────────────────────────────────────────────────────────
+EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
+
+# ─── Language Model ───────────────────────────────────────────────────────────
+LLM_MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
+LLM_MAX_NEW_TOKENS = 512
+LLM_TEMPERATURE = 0.2
+LLM_REPETITION_PENALTY = 1.1
+# Load in 4-bit to fit within 6 GB VRAM
+LLM_LOAD_IN_4BIT = True
+
+# ─── Chunking ─────────────────────────────────────────────────────────────────
+CHUNK_SIZE = 512
+CHUNK_OVERLAP = 64
+
+# ─── Retrieval ────────────────────────────────────────────────────────────────
+# Number of chunks to retrieve per query
+RETRIEVAL_TOP_K = 5
+# Dense score threshold below which we consider the query out-of-domain
+# (normalised cosine similarity; range 0-1)
+RELEVANCE_THRESHOLD = 0.30
+
+# ─── XLSX Parsing ─────────────────────────────────────────────────────────────
+# Sheets in the product knowledge XLSX that should NOT be parsed for Q&A
+XLSX_SKIP_SHEETS = {"Main", "Rate Sheet July 1 2024", "Sheet1"}
+
+# ─── Guardrails ───────────────────────────────────────────────────────────────
+GUARDRAILS_CONFIG_DIR = BASE_DIR / "configs"
+
+# ─── Presidio (PII anonymisation) ─────────────────────────────────────────────
+# Entity types to detect and anonymise
+PII_ENTITIES = [
+    "PERSON",
+    "PHONE_NUMBER",
+    "EMAIL_ADDRESS",
+    "IBAN_CODE",
+    "CREDIT_CARD",
+    "LOCATION",
+    "NRP",  # Pakistani national ID
+]

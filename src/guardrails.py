@@ -86,28 +86,41 @@ _HARD_BLOCK_KEYWORDS: set[str] = {
     "terrorist",
 }
 
-# Competitor bank names (output should not praise them)
+# Competitor bank names (output should not praise them).
+# Patterns must be specific enough to avoid false-positives on common English
+# words.  Short initialisms are kept only where unambiguous in a banking
+# context; single common-word patterns (e.g. "ask") have been removed.
 _COMPETITOR_BANKS: list[re.Pattern] = [
     re.compile(p, re.IGNORECASE)
     for p in [
+        # Habib Bank Limited — "hbl" is a rare initialism outside banking
         r"\bhbl\b",
-        r"habib bank",
+        r"habib\s+bank",
+        # United Bank Limited — "ubl" is rare outside banking
         r"\bubl\b",
-        r"united bank",
-        r"\bmcb\b",
-        r"muslim commercial bank",
+        r"united\s+bank\s+limited",
+        # MCB Bank — require "bank" qualifier to avoid matching the electronics
+        # abbreviation (e.g. "MCB" = miniature circuit breaker)
+        r"\bmcb\s+bank\b",
+        r"muslim\s+commercial\s+bank",
+        # National Bank of Pakistan
         r"\bnbp\b",
-        r"national bank of pakistan",
-        r"standard chartered",
-        r"meezan bank",
-        r"bank alfalah",
-        r"alfalah bank",
-        r"\bscb\b",
-        r"bank al habib",
-        r"\bask\b",
-        r"askari bank",
-        r"faysal bank",
-        r"js bank",
+        r"national\s+bank\s+of\s+pakistan",
+        # Standard Chartered — "SCB" removed; covered by full name below
+        r"standard\s+chartered",
+        # Meezan Bank
+        r"meezan\s+bank",
+        # Bank Alfalah
+        r"bank\s+alfalah",
+        r"alfalah\s+bank",
+        # Bank Al Habib
+        r"bank\s+al\s+habib",
+        # Askari Bank — "ask" removed (common English verb); full name required
+        r"askari\s+bank",
+        # Faysal Bank
+        r"faysal\s+bank",
+        # JS Bank
+        r"js\s+bank",
     ]
 ]
 

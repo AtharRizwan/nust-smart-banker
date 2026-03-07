@@ -24,6 +24,7 @@ from sentence_transformers import SentenceTransformer
 from configs.settings import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL_NAME,
+    HF_TOKEN,
     QDRANT_COLLECTION_NAME,
     QDRANT_DIR,
     RETRIEVAL_TOP_K,
@@ -59,7 +60,9 @@ class BankRetriever:
 
     def __init__(self) -> None:
         logger.info("Loading embedding model: %s", EMBEDDING_MODEL_NAME)
-        self.embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        # token=None is treated as "no token" by sentence-transformers
+        _hf_token: str | None = HF_TOKEN or None
+        self.embed_model = SentenceTransformer(EMBEDDING_MODEL_NAME, token=_hf_token)
 
         # Persist Qdrant to disk so vectors survive app restarts
         QDRANT_DIR.mkdir(parents=True, exist_ok=True)
@@ -193,13 +196,15 @@ class BankRetriever:
         query_vec = self.embed_query(query)
         dense_k = min(top_k * 3, max(self.count(), 1))
 
-        dense_results = self.client.search(
+        # qdrant-client >= 1.7 replaced client.search() with client.query_points()
+        response = self.client.query_points(
             collection_name=QDRANT_COLLECTION_NAME,
-            query_vector=query_vec,
+            query=query_vec,
             limit=dense_k,
             with_payload=True,
             with_vectors=False,
         )
+        dense_results = response.points
 
         if not dense_results:
             return []

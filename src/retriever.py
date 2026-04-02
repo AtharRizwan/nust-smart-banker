@@ -62,6 +62,7 @@ class BankRetriever:
 
     def __init__(self) -> None:
         import torch
+
         # token=None is treated as "no token" by sentence-transformers
         _hf_token: str | None = HF_TOKEN or None
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -84,9 +85,12 @@ class BankRetriever:
 
         self._ensure_collection()
 
-        # In-memory BM25 index rebuilt on every upsert (or lazily on first search)
+        # BM25 index: built per-search over the dense-search candidate set
+        # (~top_k * 3 docs).  No caching — rebuilding over ~30 candidates is
+        # fast enough.  The fields below are kept for future optimisation but
+        # are currently unused by the search path.
         self._bm25: BM25Okapi | None = None
-        self._bm25_docs: List[Document] = []
+        self._bm25_docs: List[Document] | None = None
 
     # ── Collection Management ─────────────────────────────────────────────────
 

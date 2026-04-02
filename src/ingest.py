@@ -61,7 +61,16 @@ def _build_anonymizer():
         return None, None
 
 
-_analyzer, _anonymizer = _build_anonymizer()
+_analyzer = None
+_anonymizer = None
+
+
+def _get_anonymizer():
+    """Return (analyzer, anonymizer), lazily initializing on first call."""
+    global _analyzer, _anonymizer
+    if _analyzer is None:
+        _analyzer, _anonymizer = _build_anonymizer()
+    return _analyzer, _anonymizer
 
 
 def anonymize_text(text: str) -> str:
@@ -73,15 +82,16 @@ def anonymize_text(text: str) -> str:
         return text
 
     # ── Presidio path ────────────────────────────────────────────────────────
-    if _analyzer and _anonymizer:
+    analyzer, anonymizer = _get_anonymizer()
+    if analyzer and anonymizer:
         try:
-            results = _analyzer.analyze(
+            results = analyzer.analyze(
                 text=text,
                 entities=PII_ENTITIES,
                 language="en",
             )
             if results:
-                anonymized = _anonymizer.anonymize(text=text, analyzer_results=results)
+                anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
                 return anonymized.text
             return text
         except Exception as exc:

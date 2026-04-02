@@ -22,8 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Set Hugging Face and Torch cache to the project directory to avoid C: drive space issues
 os.environ["HF_HOME"] = str(BASE_DIR / ".cache" / "huggingface")
 os.environ["HF_HUB_CACHE"] = str(BASE_DIR / ".cache" / "huggingface" / "hub")
-os.environ["TRANSFORMERS_CACHE"] = str(BASE_DIR / ".cache" / "huggingface" / "transformers")
-os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(BASE_DIR / ".cache" / "sentence_transformers")
+os.environ["TRANSFORMERS_CACHE"] = str(
+    BASE_DIR / ".cache" / "huggingface" / "transformers"
+)
+os.environ["SENTENCE_TRANSFORMERS_HOME"] = str(
+    BASE_DIR / ".cache" / "sentence_transformers"
+)
 os.environ["TORCH_HOME"] = str(BASE_DIR / ".cache" / "torch")
 
 DATA_DIR = BASE_DIR / "data"
@@ -51,8 +55,8 @@ LLM_REPETITION_PENALTY = 1.1
 LLM_LOAD_IN_4BIT = True
 
 # ─── Chunking ─────────────────────────────────────────────────────────────────
-CHUNK_SIZE = 512
-CHUNK_OVERLAP = 64
+CHUNK_SIZE = 1536
+CHUNK_OVERLAP = 128
 
 # ─── Retrieval ────────────────────────────────────────────────────────────────
 # Number of chunks to retrieve per query
@@ -63,7 +67,7 @@ RELEVANCE_THRESHOLD = 0.30
 
 # ─── XLSX Parsing ─────────────────────────────────────────────────────────────
 # Sheets in the product knowledge XLSX that should NOT be parsed for Q&A
-XLSX_SKIP_SHEETS = {"Main", "Rate Sheet July 1 2024", "Sheet1"}
+XLSX_SKIP_SHEETS = {"Sheet1"}
 
 # ─── Guardrails ───────────────────────────────────────────────────────────────
 GUARDRAILS_CONFIG_DIR = BASE_DIR / "configs"
@@ -71,11 +75,8 @@ GUARDRAILS_CONFIG_DIR = BASE_DIR / "configs"
 # ─── Presidio (PII anonymisation) ─────────────────────────────────────────────
 # Entity types to detect and anonymise
 PII_ENTITIES = [
-    "PERSON",
     "PHONE_NUMBER",
     "EMAIL_ADDRESS",
     "IBAN_CODE",
     "CREDIT_CARD",
-    "LOCATION",
-    "NRP",  # Pakistani national ID
 ]

@@ -130,6 +130,8 @@ def _init_session() -> None:
         st.session_state.ingested = False
     if "doc_count" not in st.session_state:
         st.session_state.doc_count = 0
+    if "selected_tab" not in st.session_state:
+        st.session_state.selected_tab = 0
 
 
 _init_session()
@@ -448,6 +450,166 @@ def render_architecture_tab() -> None:
     """)
 
 
+# ─── Documents Tab ────────────────────────────────────────────────────────────
+
+
+def _load_all_documents(retriever) -> list[dict]:
+    """
+    Fetch every point from Qdrant and return as a list of dicts with
+    page_content and metadata.  Results are cached in session_state so
+    the collection is only scrolled once per session.
+    """
+    cache_key = "_docs_cache"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
+
+    points = []
+    offset = None
+    while True:
+        batch = retriever.client.scroll(
+            collection_name="nust_bank_docs",
+            limit=256,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points.extend(batch[0])
+        if len(batch[0]) < 256:
+            break
+        offset = batch[0][-1].id
+
+    docs = []
+    for point in points:
+        payload = point.payload or {}
+        docs.append(
+            {
+                "id": point.id,
+                "content": payload.get("page_content", ""),
+                "source": payload.get("source", ""),
+                "product": payload.get("product", ""),
+                "doc_type": payload.get("doc_type", ""),
+                "category": payload.get("category", ""),
+            }
+        )
+
+    st.session_state[cache_key] = docs
+    return docs
+
+
+def render_documents_tab(retriever) -> None:
+    st.markdown("## 📄 Indexed Documents")
+    st.markdown(
+        "Browse every document currently stored in the knowledge base. "
+        "Use the filters below to narrow down by source or product."
+    )
+
+    docs = _load_all_documents(retriever)
+
+    if not docs:
+        st.info("No documents indexed yet.")
+        return
+
+    # ── Stats row ─────────────────────────────────────────────────────────────
+    sources = sorted({d["source"] for d in docs})
+    products = sorted({d["product"] for d in docs if d.get("product")})
+
+    stat_cols = st.columns(4)
+    stat_cols[0].metric("Total documents", len(docs))
+    stat_cols[1].metric("Sources", len(sources))
+    stat_cols[2].metric("Products", len(products))
+    doc_types = {d.get("doc_type", "unknown") for d in docs}
+    stat_cols[3].metric("Doc types", len(doc_types))
+
+    st.markdown("---")
+
+    # ── Filters ───────────────────────────────────────────────────────────────
+    filter_cols = st.columns(3)
+    with filter_cols[0]:
+        selected_source = st.selectbox(
+            "Filter by source", ["All"] + sources, key="source_filter"
+        )
+    with filter_cols[1]:
+        selected_product = st.selectbox(
+            "Filter by product", ["All"] + products, key="product_filter"
+        )
+    with filter_cols[2]:
+        search_text = st.text_input(
+            "Search content", placeholder="e.g. 'auto finance'", key="content_search"
+        )
+
+    # Reset pagination when filters change
+    if "last_filters" not in st.session_state:
+        st.session_state.last_filters = (selected_source, selected_product, search_text)
+    current_filters = (selected_source, selected_product, search_text)
+    if current_filters != st.session_state.last_filters:
+        st.session_state.doc_page = 1
+        st.session_state.last_filters = current_filters
+
+    # Apply filters
+    filtered = docs
+    if selected_source != "All":
+        filtered = [d for d in filtered if d["source"] == selected_source]
+    if selected_product != "All":
+        filtered = [d for d in filtered if d["product"] == selected_product]
+    if search_text:
+        needle = search_text.lower()
+        filtered = [d for d in filtered if needle in d["content"].lower()]
+
+    st.caption(f"Showing {len(filtered)} of {len(docs)} documents")
+
+    # ── Document list ─────────────────────────────────────────────────────────
+    if not filtered:
+        st.info("No documents match the current filters.")
+        return
+
+    # Pagination
+    page_size = 20
+    total_pages = max(1, (len(filtered) + page_size - 1) // page_size)
+
+    if "doc_page" not in st.session_state:
+        st.session_state.doc_page = 1
+
+    if total_pages > 1:
+        page = st.slider(
+            "Page",
+            1,
+            total_pages,
+            st.session_state.doc_page,
+            key="doc_pagination",
+        )
+        st.session_state.doc_page = page
+    else:
+        # Maintain session state for consistency
+        if st.session_state.doc_page > 1:
+            st.session_state.doc_page = 1
+        page = 1
+
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_docs = filtered[start:end]
+
+    for doc in page_docs:
+        # Show first line as a heading, rest as body
+        lines = doc["content"].strip().split("\n", 1)
+        title = lines[0][:120]
+        body = lines[1] if len(lines) > 1 else ""
+
+        with st.expander(title):
+            meta_parts = []
+            if doc.get("source"):
+                meta_parts.append(f"**Source:** `{doc['source']}`")
+            if doc.get("product"):
+                meta_parts.append(f"**Product:** `{doc['product']}`")
+            if doc.get("doc_type"):
+                meta_parts.append(f"**Type:** `{doc['doc_type']}`")
+            if doc.get("category"):
+                meta_parts.append(f"**Category:** `{doc['category']}`")
+            st.markdown(" · ".join(meta_parts))
+            st.markdown("---")
+            if body:
+                st.markdown(body)
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 
@@ -460,8 +622,8 @@ def main() -> None:
     render_sidebar(retriever)
 
     # Main content tabs
-    tab_chat, tab_admin, tab_arch = st.tabs(
-        ["💬 Chat", "📁 Admin / Upload", "🏗️ Architecture"]
+    tab_chat, tab_admin, tab_docs, tab_arch = st.tabs(
+        ["💬 Chat", "📁 Admin / Upload", "📄 Documents", "🏗️ Architecture"]
     )
 
     with tab_chat:
@@ -470,6 +632,9 @@ def main() -> None:
 
     with tab_admin:
         render_admin_tab(retriever)
+
+    with tab_docs:
+        render_documents_tab(retriever)
 
     with tab_arch:
         render_architecture_tab()

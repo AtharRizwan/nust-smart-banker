@@ -11,8 +11,8 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
 import logging
-import uuid
 from typing import List, Tuple
 
 from langchain_core.documents import Document
@@ -151,8 +151,10 @@ class BankRetriever:
     def upsert_chunks(self, chunks: List[Document]) -> None:
         """
         Embed a list of Document chunks and upsert them into Qdrant.
-        Duplicate content is not de-duplicated at this stage; callers should
-        ensure they don't ingest the same file twice unless intended.
+
+        Point IDs are derived from an MD5 hash of the chunk content, so
+        re-ingesting identical content overwrites the existing point rather
+        than creating a duplicate.
         """
         if not chunks:
             logger.warning("upsert_chunks called with empty chunk list.")
@@ -164,7 +166,7 @@ class BankRetriever:
 
         points = [
             qmodels.PointStruct(
-                id=str(uuid.uuid4()),
+                id=hashlib.md5(chunk.page_content.encode("utf-8")).hexdigest(),
                 vector=vec,
                 payload={
                     "page_content": chunk.page_content,

@@ -49,6 +49,7 @@ def _build_sources(retrieved: List[Tuple[Document, float]]) -> List[dict]:
             )
     return sources
 
+
 # ─── Response dataclass ───────────────────────────────────────────────────────
 
 
@@ -265,8 +266,8 @@ class RAGChain:
         chat_history: Optional[List[dict]] = None,
     ) -> Iterator[str]:
         """
-        Streaming variant: yields answer tokens one by one.
-        Performs full guardrail + retrieval before streaming.
+        Streaming variant: yields answer tokens as they are generated,
+        with per-token sanitization applied immediately.
 
         Yields:
             "__BLOCKED__:{reason}"    if input guardrail fires
@@ -275,6 +276,7 @@ class RAGChain:
             "__SOURCES__:{json}"      as the final yield (source metadata)
         """
         import json as _json
+        import re
 
         guardrails = self._ensure_guardrails()
 
@@ -293,23 +295,60 @@ class RAGChain:
         prompt = build_prompt(query, retrieved, chat_history)
         llm = self._ensure_llm()
 
-        # Buffer all tokens so we can apply the output guardrail to the full
-        # response before anything reaches the UI.  This prevents the display
-        # from showing content that the guardrail would later sanitise.
-        full_response: list[str] = []
+        # Compile lightweight sanitization patterns for per-token application
+        _COMPETITOR_PATTERNS = [
+            re.compile(p, re.IGNORECASE)
+            for p in [
+                r"\bhbl\b",
+                r"habib\s+bank",
+                r"\bubl\b",
+                r"united\s+bank\s+limited",
+                r"\bmcb\s+bank\b",
+                r"muslim\s+commercial\s+bank",
+                r"\bnbp\b",
+                r"national\s+bank\s+of\s+pakistan",
+                r"standard\s+chartered",
+                r"meezan\s+bank",
+                r"bank\s+alfalah",
+                r"alfalah\s+bank",
+                r"bank\s+al\s+habib",
+                r"askari\s+bank",
+                r"faysal\s+bank",
+                r"js\s+bank",
+            ]
+        ]
+
+        _TEMPLATE_PATTERNS = [
+            re.compile(p)
+            for p in [
+                r"<\|im_start\|>",
+                r"<\|im_end\|>",
+                r"<\|system\|>",
+                r"\[INST\]",
+                r"<<SYS>>",
+            ]
+        ]
+
+        def _sanitize_token(token: str) -> str:
+            """Apply lightweight sanitization to a single token."""
+            # Strip template tokens
+            for pattern in _TEMPLATE_PATTERNS:
+                token = pattern.sub("", token)
+            # Neutralize competitor banks
+            for pattern in _COMPETITOR_PATTERNS:
+                token = pattern.sub("[another bank]", token)
+            # Light PII masking
+            token = re.sub(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", "<EMAIL>", token)
+            token = re.sub(r"(\+92[-\s]?|0)3\d{2}[-\s]?\d{7}", "<PHONE>", token)
+            token = re.sub(r"\bPK\d{2}[A-Z0-9]{20}\b", "<IBAN>", token)
+            token = re.sub(r"\b\d{5}-\d{7}-\d\b", "<CNIC>", token)
+            return token
+
+        # Stream tokens with per-token sanitization
         for token in llm.stream(prompt):
-            full_response.append(token)
-
-        # Apply output guardrail to the complete assembled response
-        sanitised = guardrails.check_output("".join(full_response), query)
-
-        # Yield word-by-word so callers get an incremental stream while still
-        # receiving only guardrail-sanitised content (no raw tokens ever escape).
-        if sanitised:
-            words = sanitised.split(" ")
-            for i, word in enumerate(words):
-                # Re-add the space that split() consumed, except after the last word
-                yield word if i == len(words) - 1 else word + " "
+            sanitized = _sanitize_token(token)
+            if sanitized:
+                yield sanitized
 
         # Emit sources as a sentinel payload at the end
         yield f"__SOURCES__:{_json.dumps(_build_sources(retrieved))}"

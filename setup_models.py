@@ -159,7 +159,7 @@ except subprocess.CalledProcessError as exc:
 # Done
 # ══════════════════════════════════════════════════════════════════════════════
 print(f"\n{'═' * 60}")
-print("  ✅  All models downloaded successfully!")
+print("  All models downloaded successfully!")
 print(f"  Cache location: {CACHE_DIR}")
 print()
 print("  You can now start the application with:")

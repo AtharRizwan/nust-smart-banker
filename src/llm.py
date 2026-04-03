@@ -40,7 +40,6 @@ def _load_model_and_tokenizer():
         TextIteratorStreamer,
     )
 
-
     # token=None is treated as "no token" by transformers, so passing an empty
     # string would cause a warning — normalise to None when unset.
     _hf_token: str | None = HF_TOKEN or None
@@ -111,6 +110,10 @@ class QwenLLM:
         self._tokenizer = None
 
     # ── Lazy load ─────────────────────────────────────────────────────────────
+
+    def load(self) -> None:
+        """Eagerly load model and tokenizer. No-op if already loaded."""
+        self._ensure_loaded()
 
     def _ensure_loaded(self) -> None:
         if self._model is None:

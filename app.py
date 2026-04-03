@@ -24,6 +24,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from configs.settings import UPLOADED_DOCS_DIR, QDRANT_DIR
+from src.rag_chain import OUT_OF_DOMAIN_RESPONSE
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -186,9 +187,7 @@ def render_sidebar(retriever) -> None:
             unsafe_allow_html=True,
         )
 
-        model_status = (
-            "✅ Ready" if st.session_state.chain_ready else "⏳ Loading on first query"
-        )
+        model_status = "✅ Ready"
         st.markdown(
             f'<div class="sidebar-stat">🤖 <b>LLM status:</b> {model_status}</div>',
             unsafe_allow_html=True,
@@ -271,7 +270,7 @@ def render_chat_tab(chain) -> None:
 
 
 def _process_query(query: str, chain) -> None:
-    """Append user message, run the chain, append assistant response."""
+    """Append user message, run the chain with streaming, append assistant response."""
     # Add user message to history
     st.session_state.messages.append({"role": "user", "content": query})
 
@@ -282,22 +281,45 @@ def _process_query(query: str, chain) -> None:
         if m["role"] in ("user", "assistant")
     ]
 
-    with st.spinner("Thinking…"):
-        t0 = time.perf_counter()
-        response = chain.answer(query, chat_history=chat_history)
-        elapsed = time.perf_counter() - t0
+    # Streaming response placeholder
+    assistant_msg = st.chat_message("assistant", avatar="🏦")
+    message_placeholder = assistant_msg.empty()
+    full_response = ""
+    sources = []
+    is_blocked = False
+    is_ood = False
 
+    t0 = time.perf_counter()
+    for token in chain.stream_answer(query, chat_history=chat_history):
+        if token.startswith("__BLOCKED__:"):
+            is_blocked = True
+            full_response = f"⚠️ {token[len('__BLOCKED__:') :]}"
+            message_placeholder.markdown(full_response)
+            break
+        elif token == "__OOD__":
+            is_ood = True
+            full_response = OUT_OF_DOMAIN_RESPONSE
+            message_placeholder.markdown(full_response)
+            break
+        elif token.startswith("__SOURCES__:"):
+            sources_json = token[len("__SOURCES__:") :]
+            try:
+                sources = json.loads(sources_json)
+            except json.JSONDecodeError:
+                pass
+            break
+        else:
+            full_response += token
+            message_placeholder.markdown(full_response)
+
+    elapsed = time.perf_counter() - t0
     st.session_state.chain_ready = True
-
-    answer_text = response.answer
-    if response.is_blocked:
-        answer_text = f"⚠️ {response.answer}"
 
     st.session_state.messages.append(
         {
             "role": "assistant",
-            "content": answer_text,
-            "sources": response.sources,
+            "content": full_response,
+            "sources": sources,
             "latency": round(elapsed, 2),
         }
     )
@@ -618,6 +640,12 @@ def main() -> None:
     retriever = _load_retriever()
     _ensure_ingested(retriever)
 
+    # Load LLM and RAG chain eagerly so first query is instant
+    with st.spinner("Loading language model (this may take a moment)…"):
+        chain = _load_chain()
+        chain._ensure_llm().load()
+    st.session_state.chain_ready = True
+
     # Render sidebar
     render_sidebar(retriever)
 
@@ -627,7 +655,6 @@ def main() -> None:
     )
 
     with tab_chat:
-        chain = _load_chain()
         render_chat_tab(chain)
 
     with tab_admin:

@@ -101,6 +101,25 @@ st.markdown(
         padding: 0.6rem 1rem;
         margin: 0.4rem 0;
         font-size: 0.85rem;
+        color: var(--nust-dark);
+    }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+        .sidebar-stat {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+        }
+        .source-pill {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+            border-color: var(--nust-green);
+        }
+        .upload-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: #444;
+            color: #aaa;
+        }
     }
 
     /* Upload zone */
@@ -133,6 +152,8 @@ def _init_session() -> None:
         st.session_state.doc_count = 0
     if "selected_tab" not in st.session_state:
         st.session_state.selected_tab = 0
+    if "is_generating" not in st.session_state:
+        st.session_state.is_generating = False
 
 
 _init_session()
@@ -244,8 +265,8 @@ def render_chat_tab(chain) -> None:
                             unsafe_allow_html=True,
                         )
 
-    # Suggested starter questions (only when chat is empty)
-    if not st.session_state.messages:
+    # Suggested starter questions (always visible except during generation)
+    if not st.session_state.is_generating:
         st.markdown("#### Suggested questions")
         starter_cols = st.columns(2)
         starters = [
@@ -260,18 +281,28 @@ def render_chat_tab(chain) -> None:
             col = starter_cols[i % 2]
             with col:
                 if st.button(q, key=f"starter_{i}", use_container_width=True):
-                    _process_query(q, chain)
+                    st.session_state.pending_query = q
+                    st.session_state.is_generating = True
                     st.rerun()
+
+    # Handle pending query set from starter button
+    if st.session_state.get("pending_query") and st.session_state.is_generating:
+        pending = st.session_state.pop("pending_query")
+        _process_query(pending, chain)
+        st.session_state.is_generating = False
+        st.rerun()
 
     # Chat input
     if prompt := st.chat_input("Ask a question about NUST Bank…"):
-        _process_query(prompt, chain)
+        st.session_state.pending_query = prompt
+        st.session_state.is_generating = True
         st.rerun()
 
 
 def _process_query(query: str, chain) -> None:
     """Append user message, run the chain with streaming, append assistant response."""
     # Add user message to history
+    st.session_state.is_generating = True
     st.session_state.messages.append({"role": "user", "content": query})
 
     # Build chat history for context (exclude the message we just added)

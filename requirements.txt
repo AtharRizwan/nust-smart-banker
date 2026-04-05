@@ -143,3 +143,7 @@ weasel==0.4.3
 wrapt==2.1.2
 xxhash==3.6.0
 zstandard==0.25.0
+peft
+trl
+datasets
+wandb

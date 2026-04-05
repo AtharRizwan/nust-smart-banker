@@ -149,6 +149,42 @@ python -m src.ingest --file /path/to/policy_update.txt --label "Transfer Policy 
 
 ---
 
+## Fine-Tuning Qwen2.5-3B-Instruct
+
+The project includes an end-to-end, reproducible QLoRA fine-tuning pipeline to tailor the base Qwen model to NUST Bank's specific knowledge base and conversational tone.
+
+### 1. Build the Dataset
+Extract Q&A pairs from all ingested documents and automatically format them into ChatML with negative (out-of-domain refusal) samples:
+```bash
+python finetune/build_dataset.py
+```
+*(Outputs `train.jsonl` and `eval.jsonl` to `finetune/data/`)*
+
+### 2. Run QLoRA Training
+Executes 4-bit PEFT training (automatically uses Unsloth on Linux/Colab or HuggingFace TRL on Windows):
+```bash
+python finetune/train.py --epochs 3
+```
+**Performance Metrics Achieved:**
+- **Validation Loss:** `0.784`
+- **Token Accuracy:** `83.4%` on the evaluation set (gracefully reverted to Best Checkpoint using early stopping parameters)
+
+### 3. Merge & Export
+Merge the trained LoRA adapter weights directly into the base Qwen model:
+```bash
+python finetune/merge_and_export.py
+```
+This generates a complete standalone model at `finetune/outputs/merged_model`.
+
+### 4. Enable in Production
+Copy `.env.example` to `.env` and set the override path:
+```dotenv
+LLM_MODEL_PATH=[path-to-project]/finetune/outputs/merged_model
+```
+Restart the Streamlit app. The Chat tab will now be using the customized NUST Bank assistant!
+
+---
+
 ## Model Details
 
 | Property | Value |

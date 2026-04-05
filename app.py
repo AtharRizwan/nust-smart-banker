@@ -280,7 +280,8 @@ def render_chat_tab(chain) -> None:
         for i, q in enumerate(starters):
             col = starter_cols[i % 2]
             with col:
-                if st.button(q, key=f"starter_{i}", width="stretch"):
+                if st.button(q, key=f"starter_{i}", use_container_width=True):
+                    st.session_state.messages.append({"role": "user", "content": q})
                     st.session_state.pending_query = q
                     st.session_state.is_generating = True
                     st.rerun()
@@ -294,6 +295,7 @@ def render_chat_tab(chain) -> None:
 
     # Chat input
     if prompt := st.chat_input("Ask a question about NUST Bank…"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
         st.session_state.pending_query = prompt
         st.session_state.is_generating = True
         st.rerun()
@@ -303,7 +305,6 @@ def _process_query(query: str, chain) -> None:
     """Append user message, run the chain with streaming, append assistant response."""
     # Add user message to history
     st.session_state.is_generating = True
-    st.session_state.messages.append({"role": "user", "content": query})
 
     # Build chat history for context (exclude the message we just added)
     chat_history = [
@@ -345,6 +346,10 @@ def _process_query(query: str, chain) -> None:
 
     elapsed = time.perf_counter() - t0
     st.session_state.chain_ready = True
+
+    # Apply final output guardrails (including percentage format) to the complete stream
+    full_response = chain._ensure_guardrails().check_output(full_response, query)
+    message_placeholder.markdown(full_response)
 
     st.session_state.messages.append(
         {

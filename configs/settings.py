@@ -45,6 +45,12 @@ EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
 
 # ─── Language Model ───────────────────────────────────────────────────────────
 LLM_MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
+# Optional: override with a local fine-tuned model path (set LLM_MODEL_PATH in .env)
+# e.g.  LLM_MODEL_PATH=e:/Farhan-LLM/nust-smart-banker/finetune/outputs/merged_model
+# When set, this takes priority over LLM_MODEL_NAME.
+LLM_MODEL_PATH: str = os.getenv("LLM_MODEL_PATH", "")
+# Effective model identifier — used everywhere a model name/path is needed
+LLM_EFFECTIVE_MODEL: str = LLM_MODEL_PATH if LLM_MODEL_PATH else LLM_MODEL_NAME
 LLM_MAX_NEW_TOKENS = 512
 LLM_TEMPERATURE = 0.2
 LLM_REPETITION_PENALTY = 1.1
@@ -60,7 +66,7 @@ CHUNK_OVERLAP = 128
 RETRIEVAL_TOP_K = 5
 # Dense score threshold below which we consider the query out-of-domain
 # (normalised cosine similarity; range 0-1)
-RELEVANCE_THRESHOLD = 0.30
+RELEVANCE_THRESHOLD = 0.35
 
 # ─── XLSX Parsing ─────────────────────────────────────────────────────────────
 # Sheets in the product knowledge XLSX that should NOT be parsed for Q&A

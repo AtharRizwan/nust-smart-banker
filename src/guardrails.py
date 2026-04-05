@@ -153,6 +153,17 @@ _HARMFUL_BLOCK_MSG = (
     "Please feel free to ask me anything about NUST Bank."
 )
 
+_OOD_BLOCK_KEYWORDS: set[str] = {
+    "recipe", "bake", "cook", "weather", "poem", "joke", "cookie", "cheesecake",
+    "movie", "song", "lyrics", "sports", "football", "cricket", "cake", "pizza", "pasta",
+    "translate", "translation", "meaning of"
+}
+
+_OOD_BLOCK_MSG = (
+    "I'm sorry, I can only assist with questions related to NUST Bank's products and services. "
+    "Is there anything I can help you with regarding your NUST Bank account or our offerings?"
+)
+
 _TOO_LONG_MSG = (
     "Your message is too long for me to process. "
     "Please keep your question concise and I'll be happy to help."
@@ -215,6 +226,12 @@ class Guardrails:
 
         query_lower = query.lower()
 
+        # OOD block keywords
+        for keyword in _OOD_BLOCK_KEYWORDS:
+            if re.search(rf"\b{re.escape(keyword)}\b", query_lower):
+                logger.warning("OOD keyword detected: '%s'", keyword)
+                return True, _OOD_BLOCK_MSG
+
         # Hard-block keywords (checked first as fast path)
         for keyword in _HARD_BLOCK_KEYWORDS:
             if re.search(rf"\b{re.escape(keyword)}\b", query_lower):
@@ -248,6 +265,17 @@ class Guardrails:
                 "I'm sorry, I wasn't able to generate a response. "
                 "Please try rephrasing your question."
             )
+
+        # ── Fix decimal formatting in percentages ────────────────────────────
+        def _fix_percentage(match):
+            val = float("0." + match.group(1))
+            return f"{val * 100:g}%"
+        
+        response = re.sub(r'0\.(\d+)\s*%', _fix_percentage, response)
+
+        # ── Fix LLM Name Hallucinations ──────────────────────────────────────
+        response = re.sub(r'\bUST Bank\b', 'NUST Bank', response, flags=re.IGNORECASE)
+        response = response.replace("[UST", "NUST")
 
         # ── Strip leaked template tokens ──────────────────────────────────────
         for pattern in _TEMPLATE_LEAK_PATTERNS:

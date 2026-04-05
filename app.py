@@ -280,7 +280,7 @@ def render_chat_tab(chain) -> None:
         for i, q in enumerate(starters):
             col = starter_cols[i % 2]
             with col:
-                if st.button(q, key=f"starter_{i}", use_container_width=True):
+                if st.button(q, key=f"starter_{i}", width="stretch"):
                     st.session_state.pending_query = q
                     st.session_state.is_generating = True
                     st.rerun()
@@ -395,18 +395,9 @@ def render_admin_tab(retriever) -> None:
         help="A human-readable name for this document that will appear in source citations.",
     )
 
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        ingest_btn = st.button(
-            "📥 Ingest Document", type="primary", use_container_width=True
-        )
-    with col2:
-        if st.button("🔄 Refresh stats", use_container_width=True):
-            st.session_state.doc_count = retriever.count()
-            st.rerun()
+    ingest_btn = st.button("📥 Ingest Document", type="primary", width="stretch")
 
     if ingest_btn and uploaded_file is not None:
-        # Save to uploaded_docs folder
         UPLOADED_DOCS_DIR.mkdir(parents=True, exist_ok=True)
         save_path = UPLOADED_DOCS_DIR / uploaded_file.name
 
@@ -419,6 +410,9 @@ def render_admin_tab(retriever) -> None:
 
                 n_chunks = ingest_file(save_path, source_label or uploaded_file.name)
                 st.session_state.doc_count = retriever.count()
+
+                if "_docs_cache" in st.session_state:
+                    del st.session_state["_docs_cache"]
 
                 if n_chunks > 0:
                     st.success(
@@ -434,6 +428,8 @@ def render_admin_tab(retriever) -> None:
             except Exception as exc:
                 st.error(f"Ingestion failed: {exc}")
                 logger.exception("Ingestion error for %s", uploaded_file.name)
+
+        st.rerun()
 
     elif ingest_btn and uploaded_file is None:
         st.warning("Please select a file to upload first.")
@@ -462,7 +458,7 @@ def render_architecture_tab() -> None:
         st.image(
             str(arch_img),
             caption="NUST Smart Banker – RAG System Architecture",
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info(
@@ -680,21 +676,30 @@ def main() -> None:
     # Render sidebar
     render_sidebar(retriever)
 
-    # Main content tabs
-    tab_chat, tab_admin, tab_docs, tab_arch = st.tabs(
-        ["💬 Chat", "📁 Admin / Upload", "📄 Documents", "🏗️ Architecture"]
+    tab_labels = ["💬 Chat", "📁 Admin / Upload", "📄 Documents", "🏗️ Architecture"]
+    selected_index = st.session_state.get("selected_tab", 0)
+    if not isinstance(selected_index, int) or selected_index < 0:
+        selected_index = 0
+    if selected_index >= len(tab_labels):
+        selected_index = 0
+
+    selected_tab_label = st.radio(
+        "Navigation",
+        options=tab_labels,
+        index=selected_index,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="main_nav",
     )
+    st.session_state.selected_tab = tab_labels.index(selected_tab_label)
 
-    with tab_chat:
+    if selected_tab_label == "💬 Chat":
         render_chat_tab(chain)
-
-    with tab_admin:
+    elif selected_tab_label == "📁 Admin / Upload":
         render_admin_tab(retriever)
-
-    with tab_docs:
+    elif selected_tab_label == "📄 Documents":
         render_documents_tab(retriever)
-
-    with tab_arch:
+    else:
         render_architecture_tab()
 
 

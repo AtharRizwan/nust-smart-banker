@@ -34,9 +34,6 @@ DATA_DIR = BASE_DIR / "data"
 QDRANT_DIR = BASE_DIR / "qdrant_data"
 UPLOADED_DOCS_DIR = BASE_DIR / "uploaded_docs"
 
-# Raw dataset files
-FAQ_JSON_PATH = DATA_DIR / "funds_transfer_app_features_faq.json"
-PRODUCT_XLSX_PATH = DATA_DIR / "NUST Bank-Product-Knowledge.xlsx"
 
 # ─── Qdrant ───────────────────────────────────────────────────────────────────
 QDRANT_COLLECTION_NAME = "nust_bank_docs"

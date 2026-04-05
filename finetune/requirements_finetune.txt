@@ -1,0 +1,19 @@
+# Fine-tuning dependencies — install SEPARATELY from the main requirements.txt
+# These are only needed for training, not for running the RAG app.
+#
+# Option A — Unsloth (recommended, Linux / WSL / Colab):
+#   pip install "unsloth[cu121-torch240] @ git+https://github.com/unslothai/unsloth.git"
+#
+# Option B — HuggingFace PEFT + TRL (Windows native fallback):
+#   pip install -r finetune/requirements_finetune.txt
+#
+# Both options require bitsandbytes (already in requirements.txt).
+
+# Core training libs
+trl>=0.8.6
+datasets>=2.18.0
+peft>=0.10.0
+accelerate>=0.28.0
+
+# Optional: experiment tracking (only needed if you set WANDB_API_KEY)
+wandb

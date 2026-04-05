@@ -28,9 +28,8 @@ import openpyxl
 from langchain_core.documents import Document
 
 from configs.settings import (
-    FAQ_JSON_PATH,
+    DATA_DIR,
     PII_ENTITIES,
-    PRODUCT_XLSX_PATH,
     UPLOADED_DOCS_DIR,
     XLSX_SKIP_SHEETS,
 )
@@ -115,7 +114,7 @@ def anonymize_text(text: str) -> str:
 # ─── JSON FAQ Loader ──────────────────────────────────────────────────────────
 
 
-def load_json_faq(path: Path = FAQ_JSON_PATH) -> List[Document]:
+def load_json_faq(path: Path) -> List[Document]:
     """
     Parse funds_transfer_app_features_faq.json and return a list of Documents.
     Each document corresponds to one Q&A pair; metadata carries the category.
@@ -652,7 +651,7 @@ def _extract_rate_sheet(ws) -> List[tuple[str, str]]:
     return pairs
 
 
-def load_xlsx_products(path: Path = PRODUCT_XLSX_PATH) -> List[Document]:
+def load_xlsx_products(path: Path) -> List[Document]:
     """
     Parse NUST Bank-Product-Knowledge.xlsx.
 
@@ -760,19 +759,47 @@ def load_uploaded_json(path: Path, source_label: str = "") -> List[Document]:
 # ─── Main Ingestion Entry Point ───────────────────────────────────────────────
 
 
+_SUPPORTED_EXTENSIONS = {".json", ".xlsx", ".xls", ".txt"}
+
+
 def ingest_all() -> int:
     """
-    Load all default data sources, chunk them, embed, and upsert to Qdrant.
-    Returns the total number of chunks indexed.
+    Auto-discover all supported files in DATA_DIR, load them, chunk,
+    embed, and upsert to Qdrant. Returns the total number of chunks indexed.
     """
-    # Import here to avoid circular dependency at module load time
     from src.retriever import get_retriever
 
     logger.info("=== Starting full data ingestion ===")
 
+    if not DATA_DIR.exists():
+        logger.warning("DATA_DIR does not exist: %s", DATA_DIR)
+        return 0
+
+    files = sorted(
+        [
+            p
+            for p in DATA_DIR.iterdir()
+            if p.is_file() and p.suffix.lower() in _SUPPORTED_EXTENSIONS
+        ]
+    )
+
+    if not files:
+        logger.warning("No supported files found in %s.", DATA_DIR)
+        return 0
+
     docs: List[Document] = []
-    docs.extend(load_json_faq())
-    docs.extend(load_xlsx_products())
+    for path in files:
+        ext = path.suffix.lower()
+        try:
+            if ext == ".json":
+                docs.extend(load_uploaded_json(path, source_label=path.stem))
+            elif ext in {".xlsx", ".xls"}:
+                docs.extend(load_xlsx_products(path))
+            else:
+                docs.extend(load_text_file(path, source_label=path.stem))
+            logger.info("  Loaded: %s", path.name)
+        except Exception as exc:
+            logger.warning("  Failed to load %s: %s", path.name, exc)
 
     if not docs:
         logger.error("No documents loaded — check data files.")
